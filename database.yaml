@@ -1,0 +1,28 @@
+
+provider: sqlite
+filename: test.db
+create_db: True
+
+---
+
+provider: postgres
+host: 
+user: 
+password: 
+database: 
+
+---
+
+provider: mysql
+host: 
+user: 
+passwd: 
+db: 
+
+---
+
+# db.bind(provider='sqlite', filename=':memory:')
+# db.bind(provider='sqlite', filename='filename', create_db=True)
+# db.bind(provider='mysql', host='', user='', passwd='', db='')
+# db.bind(provider='oracle', user='', password='', dsn='')
+# db.bind(provider='postgres', user='', password='', host='', database='')
