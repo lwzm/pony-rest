@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 """
 money patch first
@@ -184,14 +184,20 @@ def make_application():
     return WSGIAdapter(make_app(Entity))
 
 
-def start(port=3333):
+def start(port=3333, addr="", sock=None):
     from tornado.log import enable_pretty_logging
     enable_pretty_logging()
     app = make_app(Entity)
-    app.listen(port, xheaders=True)
+    if sock:
+        from tornado.httpserver import HTTPServer
+        from tornado.netutil import bind_unix_socket
+        unix_socket = bind_unix_socket(sock, 0o666)
+        HTTPServer(app, xheaders=True).add_socket(unix_socket)
+    else:
+        app.listen(port, addr, xheaders=True)
     from tornado.ioloop import IOLoop
     IOLoop.current().start()
 
 
 if __name__ == '__main__':
-    start()
+    start(addr='127.1.1.1', sock='s')
