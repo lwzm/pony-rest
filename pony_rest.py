@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+__version__ = "1.0"
+
 """
 money patch first
 converting.str2datetime = my custom str2datetime must be first
@@ -52,26 +54,25 @@ class BaseHandler(tornado.web.RequestHandler):
         return self._json
 
 
-op_map = {
-    "eq": "=",
-    "gt": ">",
-    "lt": "<",
-    "like": "like",
-}
-
-args_not_used = {"order", "select", }
-
 database = pony.orm.Database()
 Entity = database.Entity
-
-
-def noop(x):
-    return x
 
 
 def magic_it(Entity):
     from pony import orm
     from pony.converting import str2datetime, str2date
+
+    op_map = {
+        "eq": "=",
+        "gt": ">",
+        "lt": "<",
+        "like": "like",
+    }
+
+    args_not_used = {"order", "select", }
+
+    def identity(x):
+        return x
 
     converts = {}
 
@@ -85,7 +86,7 @@ def magic_it(Entity):
         elif t is date:
             conv = str2date
         elif t is str:
-            conv = noop
+            conv = identity
         converts[i.column] = conv
 
     class Handler(BaseHandler):
