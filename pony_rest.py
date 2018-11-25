@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 """
 money patch first
@@ -54,7 +54,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
 
 database = pony.orm.Database()
-Entity = database.Entity
+BaseEntity = database.Entity
 
 
 def magic_it(Entity):
@@ -171,7 +171,7 @@ def magic_it(Entity):
     return f"/{name}", Handler
 
 
-def make_app(Entity):
+def make_app():
     import yaml
     with open("database.yaml") as f:
         options, *_ = yaml.load_all(f)
@@ -179,20 +179,20 @@ def make_app(Entity):
     database.generate_mapping(create_tables=True)
     handlers = [
         magic_it(i)
-        for i in Entity.__subclasses__()
+        for i in BaseEntity.__subclasses__()
     ]
     return tornado.web.Application(handlers)
 
 
 def make_application():
     from tornado.wsgi import WSGIAdapter
-    return WSGIAdapter(make_app(Entity))
+    return WSGIAdapter(make_app())
 
 
 def start(port=3333, addr="", sock=None):
     from tornado.log import enable_pretty_logging
     enable_pretty_logging()
-    app = make_app(Entity)
+    app = make_app()
     if sock:
         from tornado.httpserver import HTTPServer
         from tornado.netutil import bind_unix_socket
