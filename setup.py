@@ -20,6 +20,7 @@ setup(
     keywords="rest restful pony tornado http api".split(),
     url="https://github.com/lwzm/pony-rest",
     py_modules=["pony_rest"],
+    install_requires="pony tornado pendulum pyyaml".split(),
     classifiers=[
         "Environment :: Console",
         "Programming Language :: Python :: 3",
