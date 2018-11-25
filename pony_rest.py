@@ -116,7 +116,6 @@ def magic_it(Entity):
             if filters:
                 q = q.filter(lambda x: raw_sql(" and ".join(filters)))
 
-
             order = self.get_argument("order", None)
             if order:
                 field, _, sc = order.partition(".")
@@ -138,11 +137,15 @@ def magic_it(Entity):
             exact = "count=exact" in headers.get("Prefer", "")
             count = "*"
 
+            # https://docs.ponyorm.com/api_reference.html#Entity.to_dict
+            # http://postgrest.org/en/latest/api.html#vertical-filtering-columns
+            only = self.get_argument("select", None)
+            only = only and only.split(",")
             with db_session:
                 q = self._select()
                 if exact:
                     count = q.count()
-                lst = [i.to_dict() for i in q[start:stop + 1]]
+                lst = [i.to_dict(only) for i in q[start:stop + 1]]
 
             self.set_header("Content-Range", f"{start}-{stop}/{count}")
 
