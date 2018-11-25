@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 """
 money patch first
@@ -29,7 +29,6 @@ assert pony.orm.dbapiprovider.str2datetime is str2datetime
 
 
 import json
-import urllib.parse
 
 import tornado.web
 
@@ -59,7 +58,8 @@ Entity = database.Entity
 
 
 def magic_it(Entity):
-    from pony import orm
+    from urllib.parse import parse_qsl
+    from pony.orm import db_session, raw_sql
     from pony.converting import str2datetime, str2date
 
     op_map = {
@@ -92,10 +92,14 @@ def magic_it(Entity):
     class Handler(BaseHandler):
 
         def _select(self):
+            """
+            see:
+                https://docs.ponyorm.com/queries.html#using-raw-sql-ref
+            """
             filters = []
             args = []
 
-            for k, v in urllib.parse.parse_qsl(self.request.query):
+            for k, v in parse_qsl(self.request.query):
                 if k in args_not_used:
                     continue
                 op, _, value = v.partition(".")
@@ -105,12 +109,13 @@ def magic_it(Entity):
                 value = converts[k](value)
                 op = op_map[op]
                 idx = len(args)
-                filters.append(f"{k} {op} $(args[{idx}])")
+                filters.append(f"{k} {op} $args[{idx}]")
                 args.append(value)
 
             q = Entity.select()
             if filters:
-                q = q.filter(lambda x: orm.raw_sql(" and ".join(filters)))
+                q = q.filter(lambda x: raw_sql(" and ".join(filters)))
+
 
             order = self.get_argument("order", None)
             if order:
@@ -133,7 +138,7 @@ def magic_it(Entity):
             exact = "count=exact" in headers.get("Prefer", "")
             count = "*"
 
-            with orm.db_session:
+            with db_session:
                 q = self._select()
                 if exact:
                     count = q.count()
@@ -147,18 +152,18 @@ def magic_it(Entity):
                 self.write_json(lst)
 
         def post(self):
-            with orm.db_session:
+            with db_session:
                 Entity(**self.json)
 
         def patch(self):
             if not self.json:
                 return
-            with orm.db_session:
+            with db_session:
                 single, = self._select()
                 single.set(**self.json)
 
         def delete(self):
-            with orm.db_session:
+            with db_session:
                 single, = self._select()
                 single.delete()
 
