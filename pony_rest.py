@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-__version__ = "1.3"
-
 """
 money patch first
 converting.str2datetime = my custom str2datetime must be first
