@@ -176,6 +176,10 @@ def make_app():
     import yaml
     with open("database.yaml") as f:
         options, *_ = yaml.load_all(f)
+        fn = options["filename"]
+        if fn != ":memory:":
+            from os.path import abspath
+            options["filename"] = abspath(fn)  # patch sqlite
     database.bind(**options)
     database.generate_mapping(create_tables=True)
     handlers = [

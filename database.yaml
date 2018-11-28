@@ -1,6 +1,6 @@
 
 provider: sqlite
-filename: test.db
+filename: ":memory:"
 create_db: True
 
 ---
