@@ -24,6 +24,10 @@ class TestHelloApp(AsyncHTTPTestCase):
     def get_app(self):
         return self.app
 
+    def test_export(self):
+        rsp = self.fetch('/')
+        self.assertIsInstance(json.loads(rsp.body), list)
+
     def test_get(self):
         rsp = self.fetch('/t')
         self.assertEqual(rsp.code, 200)
