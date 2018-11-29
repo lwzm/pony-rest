@@ -51,6 +51,10 @@ class BaseHandler(tornado.web.RequestHandler):
         return self._json
 
 
+database = pony.orm.Database()
+BaseEntity = database.Entity
+
+
 class ExportHandler(BaseHandler):
     def get(self):
         from pony.orm import Json
@@ -111,14 +115,10 @@ class ExportHandler(BaseHandler):
             for f in i["fs"]:
                 t = f["type"]
                 if not isinstance(t, str):
-                    assert issubclass(t, Entity), t
+                    assert issubclass(t, BaseEntity), t
                     f["foreignKey"] = pks[f.pop("type")]
         # 3
         self.write_json(lst)
-
-
-database = pony.orm.Database()
-BaseEntity = database.Entity
 
 
 def magic_it(Entity):
