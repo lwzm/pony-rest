@@ -245,8 +245,8 @@ def make_app():
     try:
         with open("database.yaml") as f:
             options, *_ = yaml.load_all(f)  # only need the first options
-            fn = options["filename"]
-            if fn != ":memory:":
+            fn = options.get("filename")
+            if fn and fn != ":memory:":
                 from os.path import abspath
                 options["filename"] = abspath(fn)  # patch sqlite
     except FileNotFoundError:
