@@ -154,11 +154,13 @@ def magic_it(Entity):
         converts[i.column] = conv
 
     class Handler(BaseHandler):
+        """Implement subset of postgrest, see:
+        https://postgrest.org/
+        """
 
         def _select(self):
-            """
-            see:
-                https://docs.ponyorm.com/queries.html#using-raw-sql-ref
+            """Must under with db_session, and read the doc:
+            https://docs.ponyorm.com/queries.html#using-raw-sql-ref
             """
             filters = []
             args = []
@@ -240,12 +242,15 @@ def magic_it(Entity):
 
 def make_app():
     import yaml
-    with open("database.yaml") as f:
-        options, *_ = yaml.load_all(f)
-        fn = options["filename"]
-        if fn != ":memory:":
-            from os.path import abspath
-            options["filename"] = abspath(fn)  # patch sqlite
+    try:
+        with open("database.yaml") as f:
+            options, *_ = yaml.load_all(f)  # only need the first options
+            fn = options["filename"]
+            if fn != ":memory:":
+                from os.path import abspath
+                options["filename"] = abspath(fn)  # patch sqlite
+    except FileNotFoundError:
+        options = dict(provider="sqlite", filename=":memory:", create_db=True)
     database.bind(**options)
     database.generate_mapping(create_tables=True)
     handlers = [
