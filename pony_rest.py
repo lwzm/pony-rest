@@ -251,8 +251,9 @@ def make_app():
                 options["filename"] = abspath(fn)  # patch sqlite
     except FileNotFoundError:
         options = dict(provider="sqlite", filename=":memory:", create_db=True)
+    create_tables = options.pop("create_tables", False)
     database.bind(**options)
-    database.generate_mapping(create_tables=True)
+    database.generate_mapping(create_tables=create_tables)
     handlers = [
         magic_it(i)
         for i in BaseEntity.__subclasses__()

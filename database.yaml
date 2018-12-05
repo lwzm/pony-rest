@@ -2,7 +2,7 @@
 provider: sqlite
 filename: ":memory:"
 create_db: True
-
+create_tables: True
 ---
 
 provider: postgres
@@ -10,7 +10,6 @@ host:
 user: 
 password: 
 database: 
-
 ---
 
 provider: mysql
@@ -18,7 +17,6 @@ host:
 user: 
 passwd: 
 db: 
-
 ---
 
 # db.bind(provider='sqlite', filename=':memory:')
