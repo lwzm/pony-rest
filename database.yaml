@@ -1,8 +1,8 @@
 
 provider: sqlite
 filename: ":memory:"
-create_db: True
-create_tables: True
+create_db: true
+create_tables: true
 ---
 
 provider: postgres
