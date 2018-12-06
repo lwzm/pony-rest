@@ -4,11 +4,10 @@
 money patch first
 converting.str2datetime = my custom str2datetime must be first
 """
+
 # money patch begin
 from datetime import datetime, date
-
 import pendulum
-import pony.converting
 
 def str2datetime(s):
     """
@@ -19,10 +18,10 @@ def str2datetime(s):
     dt = pendulum.parse(s, tz=tz)
     return datetime.fromtimestamp(dt.timestamp(), tz=tz)
 
+import pony.converting
 pony.converting.str2datetime = str2datetime
-
-import pony.orm  # at end
-assert pony.orm.dbapiprovider.str2datetime is str2datetime
+import pony.orm.dbapiprovider
+pony.orm.dbapiprovider.str2datetime = str2datetime
 # money patch end
 
 

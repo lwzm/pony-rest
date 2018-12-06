@@ -5,6 +5,7 @@ import random
 import string
 import unittest
 
+import pendulum
 from tornado.testing import AsyncHTTPTestCase
 
 from pony_rest import make_app, BaseEntity
@@ -64,6 +65,24 @@ class TestHelloApp(AsyncHTTPTestCase):
         data = json.loads(rsp.body)
         self.assertEqual(set(data[0]), {"id", "s"})
         self.delete(s)
+
+    def test_datetime(self):
+        rsp = self.fetch('/t', method="POST", body=json.dumps({
+            "s": "dt_1",
+            "dt": "2011-11-11 00:00:00",
+        }))
+        self.assertEqual(rsp.code, 200)
+        #print(json.loads(self.fetch('/t?s=eq.dt_1').body)[0]["dt"])
+        rsp = self.fetch('/t', method="POST", body=json.dumps({
+            "s": "dt_2",
+            "dt": "2011-11-11T00:00:00Z",
+        }))
+        self.assertEqual(rsp.code, 200)
+        rsp = self.fetch('/t', method="POST", body=json.dumps({
+            "s": "dt_3",
+            "dt": "2011-11-11T00:00:00+06",
+        }))
+        self.assertEqual(rsp.code, 200)
 
 
 if __name__ == '__main__':
