@@ -249,7 +249,7 @@ def make_app():
 def start(port=3333, addr="", sock=None):
     application = make_app()
     try:
-        from wbjoern import run
+        from bjoern import run
         args = [f"unix:{sock}"] if sock else [addr, port]
         run(application, *args)
     except ImportError:
