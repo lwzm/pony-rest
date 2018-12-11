@@ -27,104 +27,97 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 
 import json
 
-import tornado.web
+import falcon
+from pony.orm import db_session, raw_sql
+from pony.converting import str2datetime, str2date
 
 
-def json_default(x):
+def identity(x):
+    return x
+
+
+def default(x):
     if isinstance(x, datetime):
         ts = x.replace(tzinfo=pendulum.local_timezone()).timestamp()
         x = pendulum.from_timestamp(ts).astimezone()
     return str(x)
 
 
-class BaseHandler(tornado.web.RequestHandler):
-    def write_json(self, obj):
-        self.set_header("Content-Type", "application/json; charset=UTF-8")
-        self.write(json.dumps(obj, default=json_default, ensure_ascii=False,
-                              separators=(",", ":")))
-
-    @property
-    def json(self):
-        if not hasattr(self, "_json"):
-            self._json = json.loads(self.request.body)
-        return self._json
-
-
 database = pony.orm.Database()
 BaseEntity = database.Entity
 
 
-class ExportHandler(BaseHandler):
-    def get(self):
-        from pony.orm import Json
-        formats_for_js = {
-            str: "string",
-            int: "number",
-            float: "float",
-            bool: "boolean",
-            datetime: "datetime",
-            date: "date",
-            Json: "json",
-        }
-        lst = []
-        pks = {}
-        try:
-            import yaml
-            with open("patch.yaml") as f:
-                patch = yaml.load(f)
-        except FileNotFoundError:
-            patch = {}
-        # 1
-        for table in BaseEntity.__subclasses__():
-            tableName = table.__name__.lower()
-            tablePatch = patch.get(tableName, {})
-            pk = None
-            fs = []
-            for column in table._attrs_:
-                columnName = column.column
-                if not columnName:
-                    continue
-                assert column.py_type, column
-                if column.is_pk:
-                    pk = columnName
-                    pks[table] = {
-                        "tableName": tableName,
-                        "columnName": columnName,
-                    }
-                py_type = column.py_type
-                type = formats_for_js.get(py_type, py_type)
-                if type == "string" and not column.args:
-                    type = "text"
-                o = {
+def export():
+    from pony.orm import Json
+    formats_for_js = {
+        str: "string",
+        int: "number",
+        float: "float",
+        bool: "boolean",
+        datetime: "datetime",
+        date: "date",
+        Json: "json",
+    }
+    lst = []
+    pks = {}
+    try:
+        import yaml
+        with open("patch.yaml") as f:
+            patch = yaml.load(f)
+    except FileNotFoundError:
+        patch = {}
+    # 1
+    for table in BaseEntity.__subclasses__():
+        tableName = table.__name__.lower()
+        tablePatch = patch.get(tableName, {})
+        pk = None
+        fs = []
+        for column in table._attrs_:
+            columnName = column.column
+            if not columnName:
+                continue
+            assert column.py_type, column
+            if column.is_pk:
+                pk = columnName
+                pks[table] = {
+                    "tableName": tableName,
                     "columnName": columnName,
-                    "type": type,
                 }
-                o.update(tablePatch.pop(columnName, {}))
-                fs.append(o)
-
-            t = {
-                "tableName": tableName,
-                "primaryKey": pk,
-                "fs": fs,
+            py_type = column.py_type
+            type = formats_for_js.get(py_type, py_type)
+            if type == "string" and not column.args:
+                type = "text"
+            o = {
+                "columnName": columnName,
+                "type": type,
             }
-            t.update(tablePatch)
-            lst.append(t)
-        # 2
-        for i in lst:
-            for f in i["fs"]:
-                t = f["type"]
-                if not isinstance(t, str):
-                    assert issubclass(t, BaseEntity), t
-                    f["foreignKey"] = pks[f.pop("type")]
-        # 3
-        self.write_json(lst)
+            o.update(tablePatch.pop(columnName, {}))
+            fs.append(o)
+
+        t = {
+            "tableName": tableName,
+            "primaryKey": pk,
+            "fs": fs,
+        }
+        t.update(tablePatch)
+        lst.append(t)
+    # 2
+    for i in lst:
+        for f in i["fs"]:
+            t = f["type"]
+            if not isinstance(t, str):
+                assert issubclass(t, BaseEntity), t
+                f["foreignKey"] = pks[f.pop("type")]
+    # 3
+    return lst
 
 
-def magic_it(Entity):
-    from urllib.parse import parse_qsl
-    from pony.orm import db_session, raw_sql
-    from pony.converting import str2datetime, str2date
+class Export:
+    def on_get(self, req, resp):
+        resp.body = json.dumps(export(), ensure_ascii=False)
 
+
+class Table:
     op_map = {
         "eq": "=",
         "gt": ">",
@@ -134,109 +127,99 @@ def magic_it(Entity):
 
     args_not_used = {"order", "select", }
 
-    def identity(x):
-        return x
+    def __init__(self, entity):
+        converts = {}
+        for i in entity._attrs_:
+            if not i.column:
+                continue
+            t = i.py_type
+            conv = json.loads
+            if t is datetime:
+                conv = str2datetime
+            elif t is date:
+                conv = str2date
+            elif t is str:
+                conv = identity
+            converts[i.column] = conv
 
-    converts = {}
+        self.entity = entity
+        self.converts = converts
 
-    for i in Entity._attrs_:
-        if not i.column:
-            continue
-        t = i.py_type
-        conv = json.loads
-        if t is datetime:
-            conv = str2datetime
-        elif t is date:
-            conv = str2date
-        elif t is str:
-            conv = identity
-        converts[i.column] = conv
-
-    class Handler(BaseHandler):
-        """Implement subset of postgrest, see:
-        https://postgrest.org/
+    def _select(self, params):
+        """Must under with db_session, and read the doc:
+        https://docs.ponyorm.com/queries.html#using-raw-sql-ref
         """
+        filters = []
+        args = []
 
-        def _select(self):
-            """Must under with db_session, and read the doc:
-            https://docs.ponyorm.com/queries.html#using-raw-sql-ref
-            """
-            filters = []
-            args = []
+        for k, v in params.items():
+            if k in self.args_not_used:
+                continue
+            op, _, value = v.partition(".")
+            if not value:
+                continue
 
-            for k, v in parse_qsl(self.request.query):
-                if k in args_not_used:
-                    continue
-                op, _, value = v.partition(".")
-                if not value:
-                    continue
+            value = self.converts[k](value)
+            op = self.op_map[op]
+            idx = len(args)
+            filters.append(f"{k} {op} $args[{idx}]")
+            args.append(value)
 
-                value = converts[k](value)
-                op = op_map[op]
-                idx = len(args)
-                filters.append(f"{k} {op} $args[{idx}]")
-                args.append(value)
+        q = self.entity.select()
+        if filters:
+            q = q.filter(lambda x: raw_sql(" and ".join(filters)))
 
-            q = Entity.select()
-            if filters:
-                q = q.filter(lambda x: raw_sql(" and ".join(filters)))
+        order = params.get("order", None)
+        if order:
+            field, _, sc = order.partition(".")
+            sc = sc or "asc"
+            q = q.order_by(getattr(getattr(self.entity, field), sc))
 
-            order = self.get_argument("order", None)
-            if order:
-                field, _, sc = order.partition(".")
-                sc = sc or "asc"
-                q = q.order_by(getattr(getattr(Entity, field), sc))
+        return q
 
-            return q
-
-        def get(self):
-            headers = self.request.headers
-            single = ".object" in headers.get("Accept", "")
-            if single:
-                start, stop = 0, 0
+    def on_get(self, req, resp):
+        single = ".object" in req.get_header("Accept", default="")
+        if single:
+            start, stop = 0, 0
+        else:
+            list_range = req.get_header("Range")
+            if list_range:
+                start, stop = map(int, list_range.split("-"))
             else:
-                try:
-                    start, stop = map(int, headers["Range"].split("-"))
-                except KeyError:
-                    start, stop = 0, 99
-            exact = "count=exact" in headers.get("Prefer", "")
-            count = "*"
+                start, stop = 0, 99
+        exact = "count=exact" in req.get_header("Prefer", default="")
+        count = "*"
+        only = req.params.get("select", None)
+        only = only and only.split(",")
 
-            # https://docs.ponyorm.com/api_reference.html#Entity.to_dict
-            # http://postgrest.org/en/latest/api.html#vertical-filtering-columns
-            only = self.get_argument("select", None)
-            only = only and only.split(",")
-            with db_session:
-                q = self._select()
-                if exact:
-                    count = q.count()
-                lst = [i.to_dict(only) for i in q[start:stop + 1]]
+        # https://docs.ponyorm.com/api_reference.html#Entity.to_dict
+        # http://postgrest.org/en/latest/api.html#vertical-filtering-columns
+        with db_session:
+            q = self._select(req.params)
+            if exact:
+                count = q.count()
+            lst = [i.to_dict(only) for i in q[start:stop + 1]]
 
-            self.set_header("Content-Range", f"{start}-{stop}/{count}")
+        result = lst[0] if single else lst
+        resp.set_header("Content-Range", f"{start}-{stop}/{count}")
+        resp.body = json.dumps(result, default=default, ensure_ascii=False)
 
-            if single:
-                self.write_json(lst[0])
-            else:
-                self.write_json(lst)
+    def on_post(self, req, resp):
+        with db_session:
+            self.entity(**json.load(req.stream))
 
-        def post(self):
-            with db_session:
-                Entity(**self.json)
+    def on_patch(self, req, resp):
+        info = json.load(req.stream)
+        if not info:
+            return
+        with db_session:
+            single, = self._select(req.params)
+            single.set(**info)
 
-        def patch(self):
-            if not self.json:
-                return
-            with db_session:
-                single, = self._select()
-                single.set(**self.json)
-
-        def delete(self):
-            with db_session:
-                single, = self._select()
-                single.delete()
-
-    name = Entity.__name__.lower()
-    return f"/{name}", Handler
+    def on_delete(self, req, resp):
+        with db_session:
+            single, = self._select(req.params)
+            single.delete()
 
 
 def make_app():
@@ -254,33 +237,25 @@ def make_app():
     create_tables = options.pop("create_tables", False)
     database.bind(**options)
     database.generate_mapping(create_tables=create_tables)
-    handlers = [
-        magic_it(i)
-        for i in BaseEntity.__subclasses__()
-    ]
-    handlers.append(("/", ExportHandler))
-    return tornado.web.Application(handlers)
 
-
-def make_application():
-    from tornado.wsgi import WSGIAdapter
-    return WSGIAdapter(make_app())
+    app = falcon.API()
+    for i in BaseEntity.__subclasses__():
+        name = i.__name__.lower()
+        app.add_route(f"/{name}", Table(i))
+    app.add_route(f"/", Export())
+    return app
 
 
 def start(port=3333, addr="", sock=None):
-    from tornado.log import enable_pretty_logging
-    enable_pretty_logging()
-    app = make_app()
-    if sock:
-        from tornado.httpserver import HTTPServer
-        from tornado.netutil import bind_unix_socket
-        unix_socket = bind_unix_socket(sock, 0o666)
-        HTTPServer(app, xheaders=True).add_socket(unix_socket)
-    else:
-        app.listen(port, addr, xheaders=True)
-    from tornado.ioloop import IOLoop
-    IOLoop.current().start()
+    application = make_app()
+    try:
+        from bjoern import run
+        args = [f"unix:{sock}"] if sock else [addr, port]
+        run(application, *args)
+    except ImportError:
+        from wsgiref.simple_server import make_server
+        make_server(addr, port, application).serve_forever()
 
 
 if __name__ == '__main__':
-    start(addr='127.1.1.1', sock='s')
+    start(addr='127.0.0.1', sock='s')
