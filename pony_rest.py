@@ -28,7 +28,7 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 import json
 
 import falcon
-from pony.orm import db_session, raw_sql
+from pony.orm import db_session, raw_sql, Database
 from pony.converting import str2datetime, str2date
 
 
@@ -43,7 +43,7 @@ def default(x):
     return str(x)
 
 
-database = pony.orm.Database()
+database = Database()
 BaseEntity = database.Entity
 
 
