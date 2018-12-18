@@ -196,12 +196,15 @@ class Table:
         # http://postgrest.org/en/latest/api.html#vertical-filtering-columns
         with db_session:
             q = self._select(req.params)
-            if exact:
+            if exact and not single:
                 count = q.count()
             lst = [i.to_dict(only) for i in q[start:stop + 1]]
 
-        result = lst[0] if single else lst
-        resp.set_header("Content-Range", f"{start}-{stop}/{count}")
+        if single:
+            result = lst[0]
+        else:
+            resp.set_header("Content-Range", f"{start}-{stop}/{count}")
+            result = lst
         resp.body = json.dumps(result, default=default, ensure_ascii=False)
 
     def on_post(self, req, resp):
