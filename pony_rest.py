@@ -230,13 +230,13 @@ def make_app():
     try:
         with open("database.yaml") as f:
             options, *_ = yaml.load_all(f)  # only need the first options
-            fn = options.get("filename")
-            if fn and fn != ":memory:":
-                from os.path import abspath
-                options["filename"] = abspath(fn)  # patch sqlite
     except FileNotFoundError:
         options = dict(provider="sqlite", filename=":memory:",
                        create_db=True, create_tables=True)
+    fn = options.get("filename")
+    if fn and fn != ":memory:":
+        from os.path import abspath
+        options["filename"] = abspath(fn)  # patch sqlite
     create_tables = options.pop("create_tables", False)
     database.bind(**options)
     database.generate_mapping(create_tables=create_tables)
