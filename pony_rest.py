@@ -47,6 +47,13 @@ database = Database()
 BaseEntity = database.Entity
 
 
+@database.on_connect(provider='sqlite')
+def _home_sqliterc(_, conn):
+    import pathlib
+    rc = pathlib.Path.home() / ".sqliterc"
+    rc.exists() and conn.executescript(rc.read_text())
+
+
 def export():
     from pony.orm import Json
     formats_for_js = {
