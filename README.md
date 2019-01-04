@@ -63,4 +63,19 @@ curl -X PATCH -d '{"age": 10}' 'localhost:18000/person?id=eq.1'
 curl -X DELETE 'localhost:18000/person?id=eq.1'
 ```
 
+### Connect your database
+
+Create a configure file: `database.yaml` in your working directory, likes:
+```
+provider: sqlite
+filename: ":memory:"
+create_db: true
+create_tables: true
+```
+
+...and see [database.yaml](database.yaml) in this repo to find more.
+
+Note: only the first block configurations in yaml file is used for database,
+you could leave the old configurations in next blocks.
+
 ### Lots TODO...
