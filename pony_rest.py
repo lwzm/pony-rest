@@ -140,6 +140,8 @@ class Table:
             if not i.column:
                 continue
             t = i.py_type
+            if issubclass(i.py_type, BaseEntity):
+                t = i.py_type._pk_.py_type
             conv = json.loads
             if t is datetime:
                 conv = str2datetime
