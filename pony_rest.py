@@ -169,12 +169,13 @@ class Table:
             value = self.converts[k](value)
             op = self.op_map[op]
             idx = len(args)
-            filters.append(f"{k} {op} $args[{idx}]")
+            filters.append(f"x.{k} {op} $args[{idx}]")
             args.append(value)
 
-        q = self.entity.select()
         if filters:
-            q = q.filter(lambda x: raw_sql(" and ".join(filters)))
+            q = self.entity.select(lambda x: raw_sql(" and ".join(filters)))
+        else:
+            q = self.entity.select()
 
         order = params.get("order", None)
         if order:
