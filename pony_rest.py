@@ -44,8 +44,8 @@ def default(x):
 
 
 database = Database()
+database._has_generated = False
 BaseEntity = database.Entity
-
 
 @database.on_connect(provider='sqlite')
 def _home_sqliterc(_, conn):
@@ -235,7 +235,10 @@ class Table:
             single.delete()
 
 
-def make_app():
+def generate_mapping():
+    if database._has_generated:
+        return
+    database._has_generated = True
     import yaml
     try:
         with open("database.yaml") as f:
@@ -251,6 +254,9 @@ def make_app():
     database.bind(**options)
     database.generate_mapping(create_tables=create_tables)
 
+
+def make_app():
+    generate_mapping()
     app = falcon.API()
     for i in BaseEntity.__subclasses__():
         name = i.__name__.lower()
