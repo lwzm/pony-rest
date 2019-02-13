@@ -189,15 +189,22 @@ class Table:
     def on_get(self, req: Request, resp: Response):
         single = ".object" in req.get_header("Accept", default="")
         if single:
-            start, stop = 0, 0
+            start, stop = 0, 1
         else:
             list_range = req.get_header("Range")
             if list_range:
                 start, stop = map(int, list_range.split("-"))
+                stop += 1
             else:
-                start, stop = 0, 99
+                start, stop = 0, 100
+
         exact = "count=exact" in req.get_header("Prefer", default="")
         count = "*"
+        limit = req.get_param("limit")
+        offset = req.get_param("offset")
+        if limit or offset:
+            start = int(offset or 0)
+            stop = start + int(limit or 100)
         order = req.get_param("order")
         only = req.get_param("select")
         only = only.split(",") if only else None
@@ -208,7 +215,7 @@ class Table:
             q = self._select(req.params, order)
             if exact and not single:
                 count = q.count()
-            lst = [i.to_dict(only) for i in q[start:stop + 1]]
+            lst = [i.to_dict(only) for i in q[start:stop]]
 
         if single:
             result = lst[0]

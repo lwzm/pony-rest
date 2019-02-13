@@ -14,8 +14,6 @@ def test_get(client: TestClient, capsys):
     resp = client.simulate_get('/t', params=params)
     assert resp.status == HTTP_OK
     assert isinstance(resp.json, list)
-    v1, v2, *_ = (i["id"] for i in resp.json)
-    assert v1 > v2
     assert "Content-Range" in resp.headers
     resp = client.simulate_get('/t', headers={"Prefer": "count=exact"})
     assert "Content-Range" in resp.headers
