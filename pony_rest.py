@@ -132,8 +132,6 @@ class Table:
         "like": "like",
     }
 
-    args_not_used = {"order", "select", }
-
     def __init__(self, entity):
         converts = {}
         for i in entity._attrs_:
@@ -154,7 +152,7 @@ class Table:
         self.entity = entity
         self.converts = converts
 
-    def _select(self, params):
+    def _select(self, params, order=None):
         """Must under with db_session, and read the doc:
         https://docs.ponyorm.com/queries.html#using-raw-sql-ref
         """
@@ -162,7 +160,7 @@ class Table:
         args = []
 
         for k, v in params.items():
-            if k in self.args_not_used:
+            if k not in self.converts:
                 continue
             op, _, value = v.partition(".")
             if not value:
@@ -179,7 +177,6 @@ class Table:
         else:
             q = self.entity.select()
 
-        order = params.get("order", None)
         if order:
             field, _, sc = order.partition(".")
             sc = sc or "asc"
@@ -199,13 +196,14 @@ class Table:
                 start, stop = 0, 99
         exact = "count=exact" in req.get_header("Prefer", default="")
         count = "*"
-        only = req.params.get("select", None)
-        only = only and only.split(",")
+        order = req.get_param("order")
+        only = req.get_param("select")
+        only = only.split(",") if only else None
 
         # https://docs.ponyorm.com/api_reference.html#Entity.to_dict
         # http://postgrest.org/en/latest/api.html#vertical-filtering-columns
         with db_session:
-            q = self._select(req.params)
+            q = self._select(req.params, order)
             if exact and not single:
                 count = q.count()
             lst = [i.to_dict(only) for i in q[start:stop + 1]]

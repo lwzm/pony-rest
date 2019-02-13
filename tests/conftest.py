@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import pytest
-from falcon import testing
+from falcon.testing import TestClient
 from pony.orm import Required, Optional
 
 from pony_rest import BaseEntity, make_app, generate_mapping
@@ -16,4 +16,4 @@ def client():
 
     generate_mapping()
     application = make_app()
-    return testing.TestClient(application)
+    return TestClient(application)
