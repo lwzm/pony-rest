@@ -128,7 +128,9 @@ class Table:
     op_map = {
         "eq": "=",
         "gt": ">",
+        "gte": ">=",
         "lt": "<",
+        "lte": "<=",
         "like": "like",
     }
 
