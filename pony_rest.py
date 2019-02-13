@@ -27,7 +27,7 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 
 import json
 
-import falcon
+from falcon import API, Request, Response
 from pony.orm import db_session, raw_sql, Database
 from pony.converting import str2datetime, str2date
 
@@ -120,7 +120,7 @@ def export():
 
 
 class Export:
-    def on_get(self, req, resp):
+    def on_get(self, req: Request, resp: Response):
         resp.body = json.dumps(export(), ensure_ascii=False)
 
 
@@ -187,7 +187,7 @@ class Table:
 
         return q
 
-    def on_get(self, req, resp):
+    def on_get(self, req: Request, resp: Response):
         single = ".object" in req.get_header("Accept", default="")
         if single:
             start, stop = 0, 0
@@ -217,11 +217,11 @@ class Table:
             result = lst
         resp.body = json.dumps(result, default=default, ensure_ascii=False)
 
-    def on_post(self, req, resp):
+    def on_post(self, req: Request, resp: Response):
         with db_session:
             self.entity(**json.load(req.stream))
 
-    def on_patch(self, req, resp):
+    def on_patch(self, req: Request, resp: Response):
         info = json.load(req.stream)
         if not info:
             return
@@ -229,7 +229,7 @@ class Table:
             single, = self._select(req.params)
             single.set(**info)
 
-    def on_delete(self, req, resp):
+    def on_delete(self, req: Request, resp: Response):
         with db_session:
             single, = self._select(req.params)
             single.delete()
@@ -257,7 +257,7 @@ def generate_mapping():
 
 def make_app():
     generate_mapping()
-    app = falcon.API()
+    app = API()
     for i in BaseEntity.__subclasses__():
         name = i.__name__.lower()
         app.add_route(f"/{name}", Table(i))
