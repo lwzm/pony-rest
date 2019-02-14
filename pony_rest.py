@@ -47,6 +47,7 @@ database = Database()
 database._has_generated = False
 BaseEntity = database.Entity
 
+# https://docs.ponyorm.org/database.html#customizing-connection-behavior
 @database.on_connect(provider='sqlite')
 def _home_sqliterc(_, conn):
     import pathlib
