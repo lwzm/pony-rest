@@ -216,7 +216,7 @@ class Table:
             q = self._select(req.params, order)
             if exact and not single:
                 count = q.count()
-            lst = [i.to_dict(only) for i in q[start:stop]]
+            lst = [i.to_dict(only, with_lazy=True) for i in q[start:stop]]
 
         if single:
             result = lst[0]
@@ -263,7 +263,7 @@ def generate_mapping():
     database.generate_mapping(create_tables=create_tables)
 
 
-def make_app():
+def make_application():
     generate_mapping()
     app = API()
     for i in BaseEntity.__subclasses__():
@@ -272,9 +272,11 @@ def make_app():
     app.add_route(f"/", Export())
     return app
 
+make_app = make_application
+
 
 def start(port=3333, addr="", sock=None):
-    application = make_app()
+    application = make_application()
     try:
         from bjoern import run
         args = [f"unix:{sock}"] if sock else [addr, port]
