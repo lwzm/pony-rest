@@ -99,6 +99,8 @@ def export():
                 "columnName": columnName,
                 "type": type,
             }
+            if column.lazy:
+                o["hide"] = True
             o.update(tablePatch.pop(columnName, {}))
             fs.append(o)
 
