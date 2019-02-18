@@ -124,7 +124,7 @@ def export():
 
 class Export:
     def on_get(self, req: Request, resp: Response):
-        resp.body = json.dumps(export(), ensure_ascii=False)
+        resp.media = export()
 
 
 class Table:
@@ -229,10 +229,10 @@ class Table:
 
     def on_post(self, req: Request, resp: Response):
         with db_session:
-            self.entity(**json.load(req.stream))
+            self.entity(**req.media)
 
     def on_patch(self, req: Request, resp: Response):
-        info = json.load(req.stream)
+        info = req.media
         if not info:
             return
         with db_session:
