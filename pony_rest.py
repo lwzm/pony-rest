@@ -273,7 +273,7 @@ def make_application():
     for i in BaseEntity.__subclasses__():
         name = i.__name__.lower()
         app.add_route(f"/{name}", Table(i))
-    app.add_route(f"/", Export())
+    app.add_route(f"/-1", Export())
     return app
 
 make_app = make_application
