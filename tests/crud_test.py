@@ -1,5 +1,5 @@
 
-from falcon import HTTP_OK
+from falcon import HTTP_OK, HTTP_NOT_FOUND
 from falcon.testing import TestClient
 
 
@@ -10,6 +10,12 @@ def test_post(client):
 
 
 def test_get(client: TestClient, capsys):
+    params = {"s": "eq.not-exists"}
+    resp = client.simulate_get('/t', params=params)
+    assert resp.status == HTTP_OK
+    assert resp.json == []
+    resp = client.simulate_get('/t', params=params, headers={"Accept": "application/vnd.pgrst.object+json"})
+    assert resp.status == HTTP_NOT_FOUND
     params = {"order": "id.desc"}
     resp = client.simulate_get('/t', params=params)
     assert resp.status == HTTP_OK

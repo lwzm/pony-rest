@@ -27,7 +27,7 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 
 import json
 
-from falcon import API, Request, Response
+from falcon import API, Request, Response, HTTPNotFound
 from pony.orm import db_session, raw_sql, Database
 from pony.converting import str2datetime, str2date
 
@@ -221,6 +221,8 @@ class Table:
             lst = [i.to_dict(only, with_lazy=True) for i in q[start:stop]]
 
         if single:
+            if not lst:
+                raise HTTPNotFound()
             result = lst[0]
         else:
             resp.set_header("Content-Range", f"{start}-{stop}/{count}")
