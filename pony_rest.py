@@ -111,11 +111,11 @@ def export(base):
 
 
 class Export:
-    def __init__(self, base):
-        self.base = base
+    def __init__(self, entity):
+        self.entity = entity
 
     def on_get(self, req: Request, resp: Response):
-        resp.media = export(self.base)
+        resp.media = export(self.entity)
 
 
 class Table:
@@ -128,16 +128,14 @@ class Table:
         "like": "like",
     }
 
-    base = None
-
     def __init__(self, entity):
-        assert self.base
+        base = entity.__base__
         converts = {}
         for i in entity._attrs_:
             if not i.column:
                 continue
             t = i.py_type
-            if issubclass(i.py_type, self.base):
+            if issubclass(i.py_type, base):
                 t = i.py_type._pk_.py_type
             conv = json.loads
             if t is datetime:
@@ -278,11 +276,13 @@ def generate_mapping(database):
     database.generate_mapping(create_tables=create_tables)
 
 
-def make_application(module="entities", prefix="/"):
+def make_application():
+    from os import environ
+    module = environ.get("MODULE", "entities")
+    prefix = environ.get("PREFIX", "/")
     from importlib import import_module
     db = import_module(module).db
     generate_mapping(db)
-    Table.base = db.Entity
     app = API()
     for i in db.Entity.__subclasses__():
         name = i.__name__.lower()
@@ -292,6 +292,7 @@ def make_application(module="entities", prefix="/"):
 
 
 def start(port=3333, addr="", sock=None):
+    port = int(port)
     application = make_application()
     try:
         from bjoern import run
@@ -303,6 +304,7 @@ def start(port=3333, addr="", sock=None):
 
 
 if __name__ == '__main__':
-    start(addr='127.0.0.1', sock='s')
+    import sys
+    start(*sys.argv[1:])
 else:  # wsgi
     application = make_application()
