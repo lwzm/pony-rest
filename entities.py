@@ -29,3 +29,8 @@ class T(db.Entity):
     s = Required(str)
     i = Optional(int)
     dt = Optional(datetime)
+
+
+if __name__ == '__main__':
+    db.bind('sqlite', filename=':memory:')
+    db.generate_mapping(create_tables=True)

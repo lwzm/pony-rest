@@ -27,7 +27,7 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 
 import json
 
-from falcon import API, Request, Response, HTTPNotFound
+from falcon import API, Request, Response, HTTPNotFound, HTTPBadRequest
 from pony.orm import db_session, raw_sql
 from pony.converting import str2datetime, str2date
 
@@ -217,7 +217,7 @@ class Table:
 
         if single:
             if not lst:
-                raise HTTPNotFound()
+                raise HTTPNotFound(description="")
             result = lst[0]
         else:
             resp.set_header("Content-Range", f"{start}-{stop}/{count}")
@@ -228,17 +228,24 @@ class Table:
         with db_session:
             self.entity(**req.media)
 
+    def _select_one(self, params):
+        try:
+            single, = self._select(params)
+            return single
+        except ValueError as e:
+            s = e.args[0]
+            raise HTTPBadRequest(description=s[:s.index(" values")])
+
     def on_patch(self, req: Request, resp: Response):
         info = req.media
-        if not info:
-            return
         with db_session:
-            single, = self._select(req.params)
-            single.set(**info)
+            single = self._select_one(req.params)
+            if info:
+                single.set(**info)
 
     def on_delete(self, req: Request, resp: Response):
         with db_session:
-            single, = self._select(req.params)
+            single = self._select_one(req.params)
             single.delete()
 
 
