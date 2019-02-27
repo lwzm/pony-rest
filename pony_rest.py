@@ -27,8 +27,8 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 
 import json
 
-from falcon import API, Request, Response, HTTPNotFound
-from pony.orm import db_session, raw_sql, Database
+from falcon import API, Request, Response, HTTPNotFound, HTTPBadRequest
+from pony.orm import db_session, raw_sql
 from pony.converting import str2datetime, str2date
 
 
@@ -43,19 +43,7 @@ def default(x):
     return str(x)
 
 
-database = Database()
-database._has_generated = False
-BaseEntity = database.Entity
-
-# https://docs.ponyorm.org/database.html#customizing-connection-behavior
-@database.on_connect(provider='sqlite')
-def _home_sqliterc(_, conn):
-    import pathlib
-    rc = pathlib.Path.home() / ".sqliterc"
-    rc.exists() and conn.executescript(rc.read_text())
-
-
-def export():
+def export(base):
     from pony.orm import Json
     formats_for_js = {
         str: "string",
@@ -75,7 +63,7 @@ def export():
     except FileNotFoundError:
         patch = {}
     # 1
-    for table in BaseEntity.__subclasses__():
+    for table in base.__subclasses__():
         tableName = table.__name__.lower()
         tablePatch = patch.get(tableName, {})
         pk = None
@@ -116,15 +104,18 @@ def export():
         for f in i["fs"]:
             t = f["type"]
             if not isinstance(t, str):
-                assert issubclass(t, BaseEntity), t
+                assert issubclass(t, base), t
                 f["foreignKey"] = pks[f.pop("type")]
     # 3
     return lst
 
 
 class Export:
+    def __init__(self, base):
+        self.base = base
+
     def on_get(self, req: Request, resp: Response):
-        resp.media = export()
+        resp.media = export(self.base)
 
 
 class Table:
@@ -137,13 +128,16 @@ class Table:
         "like": "like",
     }
 
+    base = None
+
     def __init__(self, entity):
+        assert self.base
         converts = {}
         for i in entity._attrs_:
             if not i.column:
                 continue
             t = i.py_type
-            if issubclass(i.py_type, BaseEntity):
+            if issubclass(i.py_type, self.base):
                 t = i.py_type._pk_.py_type
             conv = json.loads
             if t is datetime:
@@ -190,6 +184,7 @@ class Table:
         return q
 
     def on_get(self, req: Request, resp: Response):
+        max_len = 1000
         single = ".object" in req.get_header("Accept", default="")
         if single:
             start, stop = 0, 1
@@ -199,7 +194,7 @@ class Table:
                 start, stop = map(int, list_range.split("-"))
                 stop += 1
             else:
-                start, stop = 0, 100
+                start, stop = 0, max_len
 
         exact = "count=exact" in req.get_header("Prefer", default="")
         count = "*"
@@ -207,7 +202,7 @@ class Table:
         offset = req.get_param("offset")
         if limit or offset:
             start = int(offset or 0)
-            stop = start + int(limit or 100)
+            stop = start + int(limit or max_len)
         order = req.get_param("order")
         only = req.get_param("select")
         only = only.split(",") if only else None
@@ -218,11 +213,11 @@ class Table:
             q = self._select(req.params, order)
             if exact and not single:
                 count = q.count()
-            lst = [i.to_dict(only, with_lazy=True) for i in q[start:stop]]
+            lst = [i.to_dict(only, with_lazy=single) for i in q[start:stop]]
 
         if single:
             if not lst:
-                raise HTTPNotFound()
+                raise HTTPNotFound(description="")
             result = lst[0]
         else:
             resp.set_header("Content-Range", f"{start}-{stop}/{count}")
@@ -233,31 +228,47 @@ class Table:
         with db_session:
             self.entity(**req.media)
 
+    def _select_one(self, params):
+        try:
+            single, = self._select(params)
+            return single
+        except ValueError as e:
+            s = e.args[0]
+            raise HTTPBadRequest(description=s[:s.index(" values")])
+
     def on_patch(self, req: Request, resp: Response):
         info = req.media
-        if not info:
-            return
         with db_session:
-            single, = self._select(req.params)
-            single.set(**info)
+            single = self._select_one(req.params)
+            if info:
+                single.set(**info)
 
     def on_delete(self, req: Request, resp: Response):
         with db_session:
-            single, = self._select(req.params)
+            single = self._select_one(req.params)
             single.delete()
 
 
-def generate_mapping():
-    if database._has_generated:
+def generate_mapping(database):
+    if getattr(database, "_has_generated", False):
         return
     database._has_generated = True
-    import yaml
+
+    # https://docs.ponyorm.org/database.html#customizing-connection-behavior
+    @database.on_connect(provider="sqlite")
+    def _home_sqliterc(_, conn):
+        import pathlib
+        rc = pathlib.Path.home() / ".sqliterc"
+        rc.exists() and conn.executescript(rc.read_text())
+
     try:
+        import yaml
         with open("database.yaml") as f:
             options, *_ = yaml.load_all(f)  # only need the first options
-    except FileNotFoundError:
+    except (ImportError, FileNotFoundError):
         options = dict(provider="sqlite", filename=":memory:",
                        create_db=True, create_tables=True)
+
     fn = options.get("filename")
     if fn and fn != ":memory:":
         from os.path import abspath
@@ -267,16 +278,17 @@ def generate_mapping():
     database.generate_mapping(create_tables=create_tables)
 
 
-def make_application():
-    generate_mapping()
+def make_application(module="entities", prefix="/"):
+    from importlib import import_module
+    db = import_module(module).db
+    generate_mapping(db)
+    Table.base = db.Entity
     app = API()
-    for i in BaseEntity.__subclasses__():
+    for i in db.Entity.__subclasses__():
         name = i.__name__.lower()
-        app.add_route(f"/{name}", Table(i))
-    app.add_route(f"/-1", Export())
+        app.add_route(f"{prefix}{name}", Table(i))
+    app.add_route(prefix, Export(db.Entity))
     return app
-
-make_app = make_application
 
 
 def start(port=3333, addr="", sock=None):
@@ -292,3 +304,5 @@ def start(port=3333, addr="", sock=None):
 
 if __name__ == '__main__':
     start(addr='127.0.0.1', sock='s')
+else:  # wsgi
+    application = make_application()
