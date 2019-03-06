@@ -5,16 +5,18 @@ money patch first
 converting.str2datetime = my custom str2datetime must be first
 """
 
-# money patch begin
 from datetime import datetime, date
+
 import pendulum
 
+tz = pendulum.local_timezone()
+
+# money patch begin
 def str2datetime(s):
     """
     parse yyyy-mm-dd HH:MM:SS or yyyy-mm-ddTHH:MM:SS[TZ]
     and return datetime with timezone
     """
-    tz = pendulum.local_timezone()
     dt = pendulum.parse(s, tz=tz)
     return datetime.fromtimestamp(dt.timestamp(), tz=tz)
 
@@ -38,8 +40,8 @@ def identity(x):
 
 def default(x):
     if isinstance(x, datetime):
-        ts = x.replace(tzinfo=pendulum.local_timezone()).timestamp()
-        x = pendulum.from_timestamp(ts).astimezone()
+        ts = x.replace(tzinfo=tz).timestamp()
+        x = pendulum.from_timestamp(ts, tz)
     return str(x)
 
 
