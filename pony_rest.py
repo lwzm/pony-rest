@@ -250,10 +250,6 @@ class Table:
 
 
 def generate_mapping(database):
-    if getattr(database, "_has_generated", False):
-        return
-    database._has_generated = True
-
     # https://docs.ponyorm.org/database.html#customizing-connection-behavior
     @database.on_connect(provider="sqlite")
     def _home_sqliterc(_, conn):
