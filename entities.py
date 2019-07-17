@@ -5,8 +5,7 @@ copy from
 https://docs.ponyorm.org/firststeps.html#defining-entities
 """
 
-from datetime import date
-from datetime import datetime
+from datetime import date, datetime
 from pony.orm import *
 
 
