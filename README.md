@@ -49,7 +49,7 @@ T=localhost:3333
 curl -H 'content-type: application/json' -d '{"name": "foo", "age": 10}' $T/person
 
 # read Person list
-curl localhost:18000/person
+curl $T/person
 
 # update Person where id is 1
 curl -H 'content-type: application/json' -X PATCH -d '{"age": 10}' "$T/person?id=eq.1"
