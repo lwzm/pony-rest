@@ -3,21 +3,18 @@ provider: sqlite
 filename: ":memory:"
 create_db: true
 create_tables: true
----
 
-provider: postgres
-user: 
-host:      # optional
-password:  # optional
-database:  # optional
----
+#provider: postgres
+#user: 
+#host:      # optional
+#password:  # optional
+#database:  # optional
 
-provider: mysql
-host: 
-user: 
-passwd: 
-db: 
----
+#provider: mysql
+#host: 
+#user: 
+#passwd: 
+#db: 
 
 # db.bind(provider='sqlite', filename=':memory:')
 # db.bind(provider='sqlite', filename='filename', create_db=True)

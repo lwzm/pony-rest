@@ -29,6 +29,7 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 
 import json
 
+import yaml
 from falcon import API, Request, Response, HTTPNotFound, HTTPBadRequest
 from pony.orm import db_session, raw_sql
 from pony.converting import str2datetime, str2date
@@ -59,9 +60,8 @@ def export(base):
     lst = []
     pks = {}
     try:
-        import yaml
         with open("patch.yaml") as f:
-            patch = yaml.load(f)
+            patch = yaml.safe_load(f)
     except FileNotFoundError:
         patch = {}
     # 1
@@ -258,10 +258,9 @@ def generate_mapping(database):
         rc.exists() and conn.executescript(rc.read_text())
 
     try:
-        import yaml
         with open("database.yaml") as f:
-            options, *_ = yaml.load_all(f)  # only need the first options
-    except (ImportError, FileNotFoundError):
+            options = yaml.safe_load(f)
+    except FileNotFoundError:
         options = dict(provider="sqlite", filename=":memory:",
                        create_db=True, create_tables=True)
 
