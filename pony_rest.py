@@ -28,6 +28,7 @@ pony.orm.dbapiprovider.str2datetime = str2datetime
 
 
 import json
+import sys
 
 import yaml
 from falcon import API, Request, Response, HTTPNotFound, HTTPBadRequest
@@ -257,10 +258,12 @@ def generate_mapping(database):
         rc = pathlib.Path.home() / ".sqliterc"
         rc.exists() and conn.executescript(rc.read_text())
 
+    cfg = "database.yaml"
     try:
-        with open("database.yaml") as f:
+        with open(cfg) as f:
             options = yaml.safe_load(f)
     except FileNotFoundError:
+        print(f"warning: {cfg} not found, use sqlite :memory: for testing", file=sys.stderr)
         options = dict(provider="sqlite", filename=":memory:",
                        create_db=True, create_tables=True)
 
@@ -301,7 +304,6 @@ def start(port=3333, addr="", sock=None):
 
 
 if __name__ == '__main__':
-    import sys
     start(*sys.argv[1:])
 else:  # wsgi
     application = make_application()
